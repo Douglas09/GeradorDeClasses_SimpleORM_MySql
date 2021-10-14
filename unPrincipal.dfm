@@ -5,6 +5,7 @@ object frmPrincipal: TfrmPrincipal
   ClientHeight = 650
   ClientWidth = 1152
   Color = clBtnFace
+  CustomTitleBar.CaptionAlignment = taCenter
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
   Font.Height = -11
@@ -187,6 +188,7 @@ object frmPrincipal: TfrmPrincipal
         Width = 165
         Height = 26
         TabOrder = 1
+        Text = 'mercurio'
       end
       object edtUserName: TEdit
         Left = 103
@@ -194,6 +196,7 @@ object frmPrincipal: TfrmPrincipal
         Width = 186
         Height = 26
         TabOrder = 2
+        Text = 'mercuser'
       end
       object edtPassword: TEdit
         Left = 367
@@ -201,6 +204,7 @@ object frmPrincipal: TfrmPrincipal
         Width = 165
         Height = 26
         TabOrder = 3
+        Text = '#merc3user21.'
       end
       object edtPort: TEdit
         Left = 103
@@ -216,6 +220,7 @@ object frmPrincipal: TfrmPrincipal
         Width = 320
         Height = 26
         TabOrder = 5
+        Text = 'mercurio.clxtlombt2av.sa-east-1.rds.amazonaws.com'
       end
       object edtSchemaName: TEdit
         Left = 104
@@ -223,6 +228,7 @@ object frmPrincipal: TfrmPrincipal
         Width = 428
         Height = 26
         TabOrder = 6
+        Text = 'mercurio'
       end
       object btnConectar: TButton
         Left = 398
@@ -430,7 +436,6 @@ object frmPrincipal: TfrmPrincipal
     UpdateOptions.EnableDelete = False
     UpdateOptions.EnableInsert = False
     UpdateOptions.EnableUpdate = False
-    Connected = True
     LoginPrompt = False
     Left = 706
     Top = 392
@@ -562,5 +567,40 @@ object frmPrincipal: TfrmPrincipal
   object FDPhysMySQLDriverLink1: TFDPhysMySQLDriverLink
     Left = 720
     Top = 472
+  end
+  object qryComentario: TFDQuery
+    Connection = FDConexao
+    SQL.Strings = (
+      ' SELECT a.`COLUMN_COMMENT`, a.`COLUMN_NAME`  '
+      ' FROM `information_schema`.`COLUMNS` a'
+      ' WHERE a.`TABLE_SCHEMA` = :banco AND a.`TABLE_NAME` = :tabela '
+      ' AND a.`COLUMN_NAME` = :coluna')
+    Left = 808
+    Top = 416
+    ParamData = <
+      item
+        Name = 'BANCO'
+        ParamType = ptInput
+      end
+      item
+        Name = 'TABELA'
+        ParamType = ptInput
+      end
+      item
+        Name = 'COLUNA'
+        ParamType = ptInput
+      end>
+    object qryComentarioCOLUMN_COMMENT: TStringField
+      AutoGenerateValue = arDefault
+      FieldName = 'COLUMN_COMMENT'
+      Origin = 'COLUMN_COMMENT'
+      Size = 2048
+    end
+    object qryComentarioCOLUMN_NAME: TStringField
+      AutoGenerateValue = arDefault
+      FieldName = 'COLUMN_NAME'
+      Origin = 'COLUMN_NAME'
+      Size = 64
+    end
   end
 end

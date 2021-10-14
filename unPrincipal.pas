@@ -65,6 +65,9 @@ type
     qryLista_TabelasTABELA: TStringField;
     cheVideo: TCheckBox;
     qryLista_TabelasTABLE_TYPE: TStringField;
+    qryComentario: TFDQuery;
+    qryComentarioCOLUMN_COMMENT: TStringField;
+    qryComentarioCOLUMN_NAME: TStringField;
     procedure btnConectarClick(Sender: TObject);
     procedure btn1Click(Sender: TObject);
     procedure FormShow(Sender: TObject);
@@ -98,15 +101,16 @@ var
   FTipoCampo: String;
   FProjeto: String;
 
-  VAutoInc : Boolean;
 
-  vEntidade : TMemo;
-  vController : TMemo;
+  VAutoInc : Boolean;
+
+
+  vEntidade : TMemo;
+
+  vController : TMemo;
   vReactList : TMemo;
   vReactForm : TMemo;
-
   SeqField : string;
-
 implementation
 
 {$R *.dfm}
@@ -129,27 +133,44 @@ begin
   FFunctionJsonToClass := TStringList.Create;
   FPK                  := TStringList.Create;
   FClasse              := TStringList.Create;
-
-  (FDMIQ.Connection).GetKeyFieldNames('', edtSchemaName.Text, aTable, '', FPK);
+  FDConexao.GetKeyFieldNames('',  '', aTable, '', FPK);
   Classe := AnsiUpperCase(Copy(aTable, 1, 1)) + Copy(aTable, 2, Length(aTable));
-
   FDMIQ.Active       := False;
   FDMIQ.MetaInfoKind := mkTableFields;
   FDMIQ.ObjectName   := aTable;
   FDMIQ.Active       := True;
-
   while not(FDMIQ.Eof) do
   begin
-    if (FDMIQ.FieldByName('COLUMN_TYPENAME').AsString.Trim.ToUpper.Contains('INT')) then
+    if (FDMIQ.FieldByName('COLUMN_TYPENAME').AsString.Trim.ToUpper = 'BIGINT') then
+    begin
+      FTipoCampo := 'Int64';
+      FProcedureLimpar.Add('  Self.' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) + ' := 0;');
+      FProcedureToJson.Add('  if (pFields.Contains(''*'') or AnsiUpperCase(pFields).Contains('' '+ ansiUpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +' '')) then');
+      FProcedureToJson.Add('    result.addPair('+ QuotedStr(ansiLowerCase(FDMIQ.FieldByName('COLUMN_NAME').AsString)) +', IntToStr(Self.' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +'));');
+      if (qryLista_TabelasTABLE_TYPE.AsString <> 'VIEW') AND (AnsiLowerCase(FDMIQ.FieldByName('COLUMN_NAME').AsString).contains('empresa_idpk')) then //CÓDIGO DA EMPRESA
+        FFunctionJsonToClass.Add('      result.'+ ansiUpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +
+                                 ' := StrToInt64(getEmpresaIdpk);')
+      else if (qryLista_TabelasTABLE_TYPE.AsString <> 'VIEW') AND (AnsiLowerCase(FDMIQ.FieldByName('COLUMN_NAME').AsString).contains('filial_idpk')) then //CÓDIGO DA FILIAL
+        FFunctionJsonToClass.Add('      result.'+ ansiUpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +
+                                 ' := StrToInt64(getFilialIdpk);')
+      else
+        FFunctionJsonToClass.Add('      Try result.'+ AnsiUpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +
+                                 ' := StrToInt64(obj.get('+ QuotedStr(AnsiLowerCase(FDMIQ.FieldByName('COLUMN_NAME').AsString)) +').JsonValue.Value); Except End;');
+    end else if (FDMIQ.FieldByName('COLUMN_TYPENAME').AsString.Trim.ToUpper.Contains('INT')) then
     begin
       FTipoCampo := 'Integer';
       FProcedureLimpar.Add('  Self.' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) + ' := 0;');
-
       FProcedureToJson.Add('  if (pFields.Contains(''*'') or AnsiUpperCase(pFields).Contains('' '+ ansiUpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +' '')) then');
       FProcedureToJson.Add('    result.addPair('+ QuotedStr(ansiLowerCase(FDMIQ.FieldByName('COLUMN_NAME').AsString)) +', IntToStr(Self.' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +'));');
-
-      FFunctionJsonToClass.Add('    Try result.'+ ansiUpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +
-                               ' := StrToInt(obj.get('+ QuotedStr(AnsiLowerCase(FDMIQ.FieldByName('COLUMN_NAME').AsString)) +').JsonValue.Value); Except End;');
+      if (qryLista_TabelasTABLE_TYPE.AsString <> 'VIEW') AND (AnsiLowerCase(FDMIQ.FieldByName('COLUMN_NAME').AsString).contains('empresa_idpk')) then //CÓDIGO DA EMPRESA
+        FFunctionJsonToClass.Add('      result.'+ ansiUpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +
+                                 ' := StrToInt(getEmpresaIdpk);')
+      else if (qryLista_TabelasTABLE_TYPE.AsString <> 'VIEW') AND (AnsiLowerCase(FDMIQ.FieldByName('COLUMN_NAME').AsString).contains('filial_idpk')) then //CÓDIGO DA FILIAL
+        FFunctionJsonToClass.Add('      result.'+ ansiUpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +
+                                 ' := StrToInt(getFilialIdpk);')
+      else
+        FFunctionJsonToClass.Add('      Try result.'+ ansiUpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +
+                                 ' := StrToInt(obj.get('+ QuotedStr(AnsiLowerCase(FDMIQ.FieldByName('COLUMN_NAME').AsString)) +').JsonValue.Value); Except End;');
     end else if ((FDMIQ.FieldByName('COLUMN_TYPENAME').AsString.Trim.ToUpper = 'NUMERIC') or
                  (FDMIQ.FieldByName('COLUMN_TYPENAME').AsString.Trim.ToUpper = 'DECIMAL') or
                  (FDMIQ.FieldByName('COLUMN_TYPENAME').AsString.Trim.ToUpper = 'FLOAT') or
@@ -161,32 +182,21 @@ begin
       FProcedureLimpar.Add('  Self.' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) + ' := 0;');
       FProcedureToJson.Add('  if (pFields.Contains(''*'') or AnsiUpperCase(pFields).Contains('' '+ ansiUpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +' '')) then');
       FProcedureToJson.Add('    result.addPair('+ QuotedStr(ansiLowerCase(FDMIQ.FieldByName('COLUMN_NAME').AsString)) +', FloatToStr(Self.' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +'));');
-      FFunctionJsonToClass.Add('    Try result.'+ ansiUpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +
+      FFunctionJsonToClass.Add('      Try result.'+ ansiUpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +
                                ' := StrToFloat(obj.get('+ QuotedStr(AnsiLowerCase(FDMIQ.FieldByName('COLUMN_NAME').AsString)) +').JsonValue.Value); Except End;');
-    end else if (FDMIQ.FieldByName('COLUMN_TYPENAME').AsString.Trim.ToUpper = 'BIGINT') then
-    begin
-      FTipoCampo := 'Int64';
-      FProcedureLimpar.Add('  Self.' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) + '(0);');
-
-      FProcedureToJson.Add('  if (pFields.Contains(''*'') or AnsiUpperCase(pFields).Contains('' '+ ansiUpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +' '')) then');
-      FProcedureToJson.Add('    result.addPair('+ QuotedStr(ansiLowerCase(FDMIQ.FieldByName('COLUMN_NAME').AsString)) +', IntToStr(Self.' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +'));');
-
-      FFunctionJsonToClass.Add('    Try result.'+ AnsiUpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +
-                               ' := StrToInt(obj.get('+ QuotedStr(AnsiLowerCase(FDMIQ.FieldByName('COLUMN_NAME').AsString)) +').JsonValue.Value); Except End;');
-
     end else if (FDMIQ.FieldByName('COLUMN_TYPENAME').AsString.Trim.ToUpper = 'BLOB SUB_TYPE 1') or
                 (FDMIQ.FieldByName('COLUMN_TYPENAME').AsString.Trim.ToUpper = 'BLOB SUB_TYPE 2') or
                 (FDMIQ.FieldByName('COLUMN_TYPENAME').AsString.Trim.ToUpper = 'BLOB SUB_TYPE 0') or
                 (FDMIQ.FieldByName('COLUMN_TYPENAME').AsString.Trim.ToUpper = 'VARCHAR') or
+                (FDMIQ.FieldByName('COLUMN_TYPENAME').AsString.Trim.ToUpper = 'JSON') or
+                (FDMIQ.FieldByName('COLUMN_TYPENAME').AsString.Trim.ToUpper = 'TEXT') or
                 (FDMIQ.FieldByName('COLUMN_TYPENAME').AsString.Trim.ToUpper = 'CHAR') then
     begin
       FTipoCampo := 'String';
       FProcedureLimpar.Add('  Self.' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) + ' := '''';');
-
       FProcedureToJson.Add('  if (pFields.Contains(''*'') or AnsiUpperCase(pFields).Contains('' '+ ansiUpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +' '')) then');
       FProcedureToJson.Add('    result.addPair('+ QuotedStr(ansiLowerCase(FDMIQ.FieldByName('COLUMN_NAME').AsString)) +', Self.' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +');');
-
-      FFunctionJsonToClass.Add('    Try result.'+ AnsiUpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +
+      FFunctionJsonToClass.Add('      Try result.'+ AnsiUpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +
                                ' := obj.get('+ QuotedStr(AnsiLowerCase(FDMIQ.FieldByName('COLUMN_NAME').AsString)) +').JsonValue.Value; Except End;');
     end
     else
@@ -194,11 +204,9 @@ begin
     begin
       FTipoCampo := 'TMemoField';
       FProcedureLimpar.Add('  Self.' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) + ' := '''';');
-
       FProcedureToJson.Add('  if (pFields.Contains(''*'') or AnsiUpperCase(pFields).Contains('' '+ ansiUpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +' '')) then');
       FProcedureToJson.Add('    result.addPair('+ QuotedStr(ansiLowerCase(FDMIQ.FieldByName('COLUMN_NAME').AsString)) +', Self.' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +'.Lines.Text);');
-
-      FFunctionJsonToClass.Add('    Try result.'+ ansiUpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +
+      FFunctionJsonToClass.Add('      Try result.'+ ansiUpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +
                                '.Text := obj.get('+ QuotedStr(AnsiLowerCase(FDMIQ.FieldByName('COLUMN_NAME').AsString)) +').JsonValue.Value; Except End;');
     end
     else
@@ -210,34 +218,28 @@ begin
     begin
       FTipoCampo := 'TDateTime';
       FProcedureLimpar.Add('  Self.' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) + ' := 0;');
-
       FProcedureToJson.Add('  if (pFields.Contains(''*'') or AnsiUpperCase(pFields).Contains('' '+ ansiUpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +' '')) then');
       FProcedureToJson.Add('    result.addPair('+ QuotedStr(ansiLowerCase(FDMIQ.FieldByName('COLUMN_NAME').AsString)) +', DateTimeToStr(Self.' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +'));');
-
-      FFunctionJsonToClass.Add('    Try result.'+ ansiUpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +
+      FFunctionJsonToClass.Add('      Try result.'+ ansiUpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) +
                                ' := StrToDateTime(obj.get('+ QuotedStr(AnsiLowerCase(FDMIQ.FieldByName('COLUMN_NAME').AsString)) +').JsonValue.Value); Except End;');
     end;
-
     FInterface.Add('    procedure Set' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) + ' (const Value :' + FTipoCampo + ');');
     FInterface.Add('    function Get' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) + ' :' + FTipoCampo + ';');
-
     for I := 0 to FPK.Count-1 do
     begin
       if FPK[I].Trim.ToUpper = FDMIQ.FieldByName('COLUMN_NAME').AsString.Trim.ToUpper then
       begin
         SeqField := '';
         VAutoInc := False;
-
-        if cheAutoInc.Checked then Verifica_AutoInc(FDMIQ.FieldByName('COLUMN_NAME').AsString);
-
+        if cheAutoInc.Checked then
+           Verifica_AutoInc(FDMIQ.FieldByName('COLUMN_NAME').AsString);
         if VAutoInc = True then
         begin
           SeqField := FDMIQ.FieldByName('COLUMN_NAME').AsString;
           MPK := '    [Campo(' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString.QuotedString) + '), PK, AutoInc]';
         end
         else
-          MPK := '    [Campo(' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString.QuotedString) + '), PK, ]';
-
+          MPK := '    [Campo(' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString.QuotedString) + '), PK]';
         VAutoInc := False;
         Break;
       end
@@ -246,48 +248,59 @@ begin
     end;
     FProperty.Add(MPK);
 
+    //Adicionar comentário nas propriedades das colunas do banco de dados
+    qryComentario.Close;
+    qryComentario.ParamByName('banco').AsString := edtSchemaName.Text;
+    if aTable.Contains('view_') then
+      qryComentario.ParamByName('tabela').AsString := Copy(aTable, 6, length(aTable))
+    else
+      qryComentario.ParamByName('tabela').AsString := aTable;
+    qryComentario.ParamByName('coluna').AsString := FDMIQ.FieldByName('COLUMN_NAME').AsString;
+    qryComentario.Open;
+
+    if (qryComentarioCOLUMN_COMMENT.AsString <> '') then
+    begin
+      FProperty.Add('    /// <summary> ' +sLineBreak+
+        '    ///  '+ StringReplace(qryComentarioCOLUMN_COMMENT.AsString, #$A, #$A + '    ///  ', [rfReplaceAll]) +sLineBreak+
+        '    /// </summary>');
+    end;
+
     FProperty.Add('    property ' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) + ' :' + FTipoCampo + ' read Get' +
       UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) + ' write Set' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) + ';');
-
     FPropertyInterface.Add('    property ' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) + ' :' + FTipoCampo + ' read Get' +
       UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) + ' write Set' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) + ';');
-
     FBody.Add('procedure T' + Classe + '.Set' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) + ' (const Value :' + FTipoCampo + ');');
-
     FBody.Add('begin');
     FBody.Add('  F' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) + ' := Value;');
     FBody.Add('end;');
     FBody.Add('');
-
     FBody.Add('function T' + Classe + '.Get' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) + ' :' + FTipoCampo + ';');
     FBody.Add('begin');
     FBody.Add('  Result := F' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) + ';');
     FBody.Add('end;');
     FBody.Add('');
-
     FPrivate.Add('    F' + UpperCase(FDMIQ.FieldByName('COLUMN_NAME').AsString) + ' :' + FTipoCampo + ';');
     FDMIQ.Next;
   end;
-
   FClasse.Clear;
-
   if (qryLista_TabelasTABLE_TYPE.AsString = 'VIEW') then
      FClasse.Add('unit View.' + Classe + ';')
   else
      FClasse.Add('unit Table.' + Classe + ';');
-
   FClasse.Add('');
   FClasse.Add('interface');
   FClasse.Add('');
   FClasse.Add('uses ');
-  FClasse.Add('  System.Json, System.SysUtils, SimpleAttributes;');
+  FClasse.Add('  Controller, System.Json, System.SysUtils, System.Variants, SimpleAttributes;');
   FClasse.Add('');
   FClasse.Add('type');
   FClasse.Add('  [Tabela(''' + AnsiLowerCase(Classe) + ''')]');
   FClasse.Add('  T' + Classe + ' = class');
   FClasse.Add('  private');
+  FClasse.Add('    FCOUNT: Integer;');
   FClasse.Add(FPrivate.Text);
   FClasse.Add(FInterface.Text);
+  FClasse.Add('    procedure SetCOUNT(const Value: Integer);');
   FClasse.Add('  public');
   FClasse.Add('    constructor Create;');
   FClasse.Add('    destructor Destroy; override;');
@@ -295,6 +308,8 @@ begin
   FClasse.Add('    function ToJson(pFields : String = ''*'') : TJSonObject;');
   FClasse.Add('    function JsonToClass(obj : TJSonObject) : T'+ Classe +';');
   FClasse.Add(FProperty.Text);
+  FClasse.Add('    [Campo(''COUNT''), Ignore]');
+  FClasse.Add('    property COUNT : Integer read FCOUNT write SetCOUNT;');
   FClasse.Add('end;');
   FClasse.Add('');
   FClasse.Add('implementation');
@@ -316,26 +331,34 @@ begin
   FClasse.Add(FProcedureLimpar.Text);
   FClasse.Add('end;');
   FClasse.Add('');
-
+  FClasse.Add('procedure T'+Classe+'.SetCOUNT(const Value: Integer);');
+  FClasse.Add('begin');
+  FClasse.Add('  FCOUNT := Value;');
+  FClasse.Add('end;');
   FClasse.Add('function T' + Classe + '.ToJson(pFields : String = ''*'') : TJSonObject;');
   FClasse.Add('begin');
   FClasse.Add('  pFields := '' ''+ StringReplace(pFields, '','', '' '', [rfReplaceAll]);');
   FClasse.Add('  result := TJSonObject.Create;');
   FClasse.Add(FProcedureToJson.Text);
   FClasse.Add('end;');
-
   FClasse.Add('function T' + Classe + '.JsonToClass(obj : TJSonObject) : T'+ Classe +';');
   FClasse.Add('begin');
   FClasse.Add('  result := T'+ Classe +'.Create;');
   FClasse.Add('  if (assigned(obj)) then');
   FClasse.Add('  begin');
+  FClasse.Add('    Try');
   FClasse.Add(FFunctionJsonToClass.Text);
+  FClasse.Add('    Except');
+  FClasse.Add('      on E : Exception do');
+  FClasse.Add('      begin');
+  FClasse.Add('        result.Free;');
+  FClasse.Add('        raise Exception.Create(E.Message);');
+  FClasse.Add('      end;');
+  FClasse.Add('    End;');
   FClasse.Add('  end;');
   FClasse.Add('end;');
-
   FClasse.Add('');
   FClasse.Add('end.');
-
   VEntidade.Text := FClasse.Text;
 
   MemVideo.Text := FClasse.Text;
@@ -367,15 +390,19 @@ var
   i: integer;
   sequence : string;
 begin
-  sequence := qryLista_TabelasTABELA.AsString + '_' + autoIncField + '_seq';
 
-  FClasse := TStringList.Create;
-  FDConexao.GetGeneratorNames('', edtSchemaName.Text, sequence, FClasse);
+  vAutoInc :=(Copy(autoIncField, 5, length(autoIncField)) = 'idpk');
 
-  if FClasse.count = 1 then
-    begin
-      VAutoInc := True;
-    end;
+
+//  sequence := qryLista_TabelasTABELA.AsString + '_' + autoIncField + '_seq';
+//
+//  FClasse := TStringList.Create;
+//  FDConexao.GetGeneratorNames('', '', sequence, FClasse);
+//
+//  if FClasse.count = 1 then
+//    begin
+//      VAutoInc := True;
+//    end;
 end;
 
 procedure TfrmPrincipal.btnConectarClick(Sender: TObject);
@@ -516,9 +543,9 @@ begin
                   CreateDir(edtPath.Text + qryLista_TabelasTABELA.asString);
 
                 if (qryLista_TabelasTABLE_TYPE.AsString = 'VIEW') then                   
-                   VEntidade.Lines.SaveToFile(edtPath.Text + qryLista_TabelasTABELA.asString + '\View.' + UpperCase(qryLista_TabelasTABELA.asString) + '.pas')
+                  VEntidade.Lines.SaveToFile(edtPath.Text + qryLista_TabelasTABELA.asString + '\View.' + UpperCase(qryLista_TabelasTABELA.asString) + '.pas')
                 else
-                   VEntidade.Lines.SaveToFile(edtPath.Text + qryLista_TabelasTABELA.asString + '\Table.' + UpperCase(qryLista_TabelasTABELA.asString) + '.pas');
+                  VEntidade.Lines.SaveToFile(edtPath.Text + qryLista_TabelasTABELA.asString + '\Table.' + UpperCase(qryLista_TabelasTABELA.asString) + '.pas');
               end;
             end;
           end
@@ -535,10 +562,10 @@ begin
                 if not DirectoryExists(edtPath.Text) then
                   CreateDir(edtPath.Text);
 
-                if (qryLista_TabelasTABLE_TYPE.AsString = 'VIEW') then                   
-                   VEntidade.Lines.SaveToFile(edtPath.Text + 'View.' + UpperCase(qryLista_TabelasTABELA.asString) + '.pas')
+                if (qryLista_TabelasTABLE_TYPE.AsString = 'VIEW') then
+                  VEntidade.Lines.SaveToFile(edtPath.Text + 'View.' + UpperCase(qryLista_TabelasTABELA.asString) + '.pas')
                 else
-                   VEntidade.Lines.SaveToFile(edtPath.Text + 'Table.' + UpperCase(qryLista_TabelasTABELA.asString) + '.pas');
+                  VEntidade.Lines.SaveToFile(edtPath.Text + 'Table.' + UpperCase(qryLista_TabelasTABELA.asString) + '.pas');
               end;
             end;
           end;
@@ -556,7 +583,8 @@ begin
   vReactList := TMemo.Create(Self);
   VReactForm := TMemo.Create(Self);
 
-  edtPath.Text := ExtractFilePath( Application.ExeName ) +'Entidades';
+  edtPath.Text := 'C:\MercurioWEB\back\projetos\MercurioServidor\fontes\Database\Model\';
+//  edtPath.Text := ExtractFilePath( Application.ExeName ) +'Entidades';
   if not (directoryExists(edtPath.Text)) then
      ForceDirectories(edtPath.Text);
 end;
@@ -583,7 +611,11 @@ begin
           CreateDir(edtPath.Text);
         if not DirectoryExists(edtPath.Text + qryLista_TabelasTABELA.asString) then
           CreateDir(edtPath.Text + qryLista_TabelasTABELA.asString);
-        VEntidade.Lines.SaveToFile(edtPath.Text + qryLista_TabelasTABELA.asString + '\Table.' + UpperCase(qryLista_TabelasTABELA.asString) + '.pas');
+
+        if (qryLista_TabelasTABLE_TYPE.AsString = 'VIEW') then
+          VEntidade.Lines.SaveToFile(edtPath.Text + qryLista_TabelasTABELA.asString + '\View.' + UpperCase(qryLista_TabelasTABELA.asString) + '.pas')
+        else
+          VEntidade.Lines.SaveToFile(edtPath.Text + qryLista_TabelasTABELA.asString + '\Table.' + UpperCase(qryLista_TabelasTABELA.asString) + '.pas');
       end;
     end;
   end
@@ -599,7 +631,11 @@ begin
           CreateDir(edtPath.Text);
         if not DirectoryExists(edtPath.Text) then
           CreateDir(edtPath.Text);
-        VEntidade.Lines.SaveToFile(edtPath.Text + 'Table.' + UpperCase(qryLista_TabelasTABELA.asString) + '.pas');
+
+        if (qryLista_TabelasTABLE_TYPE.AsString = 'VIEW') then
+          VEntidade.Lines.SaveToFile(edtPath.Text + 'View.' + UpperCase(qryLista_TabelasTABELA.asString) + '.pas')
+        else
+          VEntidade.Lines.SaveToFile(edtPath.Text + 'Table.' + UpperCase(qryLista_TabelasTABELA.asString) + '.pas');
       end;
     end;
   end;
