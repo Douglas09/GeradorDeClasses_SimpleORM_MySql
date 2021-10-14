@@ -7,6 +7,6 @@
 </br>
 <p>Será um prazer poder lhe ajudar, caso tenha dúvidas entre em contato.</p>
 </br>
-<p>Att. Macgeiver Knopf</p>
+<p>Att. Douglas Colombo - (51) 995502636 / douglascolombo09@gmail.com </p>
 
 
